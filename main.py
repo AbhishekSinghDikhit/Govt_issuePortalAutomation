@@ -8,13 +8,17 @@ from typing import Optional
 from playwright.sync_api import sync_playwright, Browser
 import base64
 from io import BytesIO
-from PIL import Image
+from PIL import Image, ImageFilter, ImageOps
 import pytesseract
 import uvicorn
 import os
 from concurrent.futures import ThreadPoolExecutor
 import threading
 from fastapi.middleware.cors import CORSMiddleware
+import cv2
+import numpy as np
+import random, string
+
 
 # Logging setup
 logging.basicConfig(
@@ -40,26 +44,26 @@ executor = ThreadPoolExecutor(max_workers=1)  # Single worker to avoid browser c
 thread_local = threading.local()
 
 # to run on localhost
-# def get_browser():
-#     if not hasattr(thread_local, "playwright"):
-#         thread_local.playwright = sync_playwright().start()
-#         thread_local.browser = thread_local.playwright.chromium.launch(
-#             headless=False, 
-#             slow_mo=500     
-#         )
-#         logger.info("✅ Browser launched successfully in thread")
-#     return thread_local.browser
-
-#for deployment
 def get_browser():
     if not hasattr(thread_local, "playwright"):
         thread_local.playwright = sync_playwright().start()
         thread_local.browser = thread_local.playwright.chromium.launch(
-            headless=True,  
-            args=["--no-sandbox", "--disable-dev-shm-usage"]  
+            headless=False, 
+            slow_mo=500     
         )
         logger.info("✅ Browser launched successfully in thread")
     return thread_local.browser
+
+#for deployment
+# def get_browser():
+#     if not hasattr(thread_local, "playwright"):
+#         thread_local.playwright = sync_playwright().start()
+#         thread_local.browser = thread_local.playwright.chromium.launch(
+#             headless=True,  
+#             args=["--no-sandbox", "--disable-dev-shm-usage"]  
+#         )
+#         logger.info("✅ Browser launched successfully in thread")
+#     return thread_local.browser
 
 @app.on_event("startup")
 async def startup_event():
@@ -79,6 +83,82 @@ async def shutdown_event():
         logger.info("Thread pool shutdown")
     except Exception as e:
         logger.exception("Error during shutdown")
+
+
+def solve_captcha(page, max_retries: int = 5):
+    """
+    Try to solve captcha with OCR. Retry if OCR fails.
+    """
+    for attempt in range(1, max_retries + 1):
+        try:
+            logger.info(f"🔄 Captcha attempt {attempt}/{max_retries}")
+
+            captcha_src = page.locator("img[alt='captcha']").get_attribute("src")
+            if not captcha_src or not captcha_src.startswith("data:image/png;base64,"):
+                logger.error("❌ Captcha image not found")
+                return None
+
+            # Decode base64 image
+            captcha_base64 = captcha_src.split(",")[1]
+            captcha_bytes = base64.b64decode(captcha_base64)
+
+            # Preprocess image
+            captcha_img = Image.open(BytesIO(captcha_bytes)).convert("L")
+            captcha_img = ImageOps.autocontrast(captcha_img)
+
+            img_cv = np.array(captcha_img)
+            _, img_cv = cv2.threshold(img_cv, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            kernel = np.ones((2, 2), np.uint8)
+            img_cv = cv2.morphologyEx(img_cv, cv2.MORPH_OPEN, kernel)
+            processed_img = Image.fromarray(img_cv)
+
+            # OCR with multiple configs
+            configs = [
+                "--psm 8 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
+                "--psm 7",
+                "--psm 6",
+            ]
+            guesses = []
+            for cfg in configs:
+                text = pytesseract.image_to_string(processed_img, config=cfg).strip()
+                if text:
+                    guesses.append(text)
+
+            captcha_text = max(guesses, key=len) if guesses else ""
+
+            logger.info(f"🔍 Captcha guesses: {guesses} | Picked: '{captcha_text}'")
+
+            if captcha_text:
+                page.fill("input[name='captchaName']", captcha_text)
+
+                # Click submit to check if captcha passes
+                page.get_by_role("button", name="Submit").click()
+                page.wait_for_timeout(3000)
+
+                # Detect if captcha was accepted or rejected
+                if not page.locator("img[alt='captcha']").is_visible():
+                    logger.info("✅ Captcha solved successfully")
+                    logger.info("Grievance submitted successfully ✅")
+                    return captcha_text
+                else:
+                    logger.warning("⚠️ Captcha rejected, retrying...")
+
+                    # Reload captcha for retry
+                    page.click("img[alt='captcha']")
+                    page.wait_for_timeout(1500)
+
+            else:
+                logger.warning("⚠️ Empty captcha guess, retrying...")
+
+        except Exception as e:
+            logger.exception(f"Error during captcha attempt {attempt}")
+
+    # If all retries fail, return a fallback
+    fallback = "".join(random.choices(string.ascii_letters + string.digits, k=5))
+    logger.error(f"❌ All captcha attempts failed, using fallback: {fallback}")
+    page.fill("input[name='captchaName']", fallback)
+    return fallback
+
 
 def automate_grievance(
     issue_text: str,
@@ -137,31 +217,19 @@ def automate_grievance(
 
         page.get_by_role("button", name="Next").click()
 
-        logger.info("Handling captcha with OCR")
-        captcha_src = page.locator("img[alt='captcha']").get_attribute("src")
-        if captcha_src and captcha_src.startswith("data:image/png;base64,"):
-            captcha_base64 = captcha_src.split(",")[1]
-            captcha_bytes = base64.b64decode(captcha_base64)
+        logger.info("Handling captcha with auto-retry OCR")
+        solve_captcha(page, max_retries=5)
 
-            captcha_img = Image.open(BytesIO(captcha_bytes))
-            captcha_text = pytesseract.image_to_string(captcha_img).strip()
+        # page.fill("input[name='captchaName']", captcha_text)
 
-            logger.info(f"🔍 OCR Captcha Guess: {captcha_text}")
-            page.fill("input[name='captchaName']", captcha_text)
-        else:
-            logger.error("Captcha not found on page")
-            page.close()
-            context.close()
-            return {"status": "error", "message": "Captcha not found"}
-
-        logger.info("Submitting grievance form")
-        page.get_by_role("button", name="Submit").click()
+        # logger.info("Submitting grievance form")
+        # page.get_by_role("button", name="Submit").click()
 
         page.wait_for_timeout(5000)
         page.close()
         context.close()
 
-        logger.info("Grievance submitted successfully ✅")
+        # logger.info("Grievance submitted successfully ✅")
         return {"status": "success", "message": "Grievance submitted successfully"}
 
     except Exception as e:

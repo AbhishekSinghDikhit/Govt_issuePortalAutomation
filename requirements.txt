@@ -4,3 +4,5 @@ pillow
 pytesseract
 uvicorn
 python-multipart
+opencv-python
+numpy
