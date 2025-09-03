@@ -1,0 +1,6 @@
+playwright
+fastapi
+pillow
+pytesseract
+uvicorn
+python-multipart
