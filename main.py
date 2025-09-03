@@ -44,26 +44,26 @@ executor = ThreadPoolExecutor(max_workers=1)  # Single worker to avoid browser c
 thread_local = threading.local()
 
 # to run on localhost
-def get_browser():
-    if not hasattr(thread_local, "playwright"):
-        thread_local.playwright = sync_playwright().start()
-        thread_local.browser = thread_local.playwright.chromium.launch(
-            headless=False, 
-            slow_mo=500     
-        )
-        logger.info("✅ Browser launched successfully in thread")
-    return thread_local.browser
-
-#for deployment
 # def get_browser():
 #     if not hasattr(thread_local, "playwright"):
 #         thread_local.playwright = sync_playwright().start()
 #         thread_local.browser = thread_local.playwright.chromium.launch(
-#             headless=True,  
-#             args=["--no-sandbox", "--disable-dev-shm-usage"]  
+#             headless=False, 
+#             slow_mo=500     
 #         )
 #         logger.info("✅ Browser launched successfully in thread")
 #     return thread_local.browser
+
+#for deployment
+def get_browser():
+    if not hasattr(thread_local, "playwright"):
+        thread_local.playwright = sync_playwright().start()
+        thread_local.browser = thread_local.playwright.chromium.launch(
+            headless=True,  
+            args=["--no-sandbox", "--disable-dev-shm-usage"]  
+        )
+        logger.info("✅ Browser launched successfully in thread")
+    return thread_local.browser
 
 @app.on_event("startup")
 async def startup_event():
