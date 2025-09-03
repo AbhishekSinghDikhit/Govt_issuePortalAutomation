@@ -30,12 +30,24 @@ executor = ThreadPoolExecutor(max_workers=1)  # Single worker to avoid browser c
 # Global Playwright/Browser (managed per thread)
 thread_local = threading.local()
 
+# to run on localhost
+# def get_browser():
+#     if not hasattr(thread_local, "playwright"):
+#         thread_local.playwright = sync_playwright().start()
+#         thread_local.browser = thread_local.playwright.chromium.launch(
+#             headless=False, 
+#             slow_mo=500     
+#         )
+#         logger.info("✅ Browser launched successfully in thread")
+#     return thread_local.browser
+
+#for deployment
 def get_browser():
     if not hasattr(thread_local, "playwright"):
         thread_local.playwright = sync_playwright().start()
         thread_local.browser = thread_local.playwright.chromium.launch(
-            headless=False,  # show browser
-            slow_mo=500      # slow motion for debugging
+            headless=True,  
+            args=["--no-sandbox", "--disable-dev-shm-usage"]  
         )
         logger.info("✅ Browser launched successfully in thread")
     return thread_local.browser
@@ -43,8 +55,7 @@ def get_browser():
 @app.on_event("startup")
 async def startup_event():
     logger.info("🚀 Starting FastAPI application...")
-    # Browser is launched lazily in get_browser()
-
+    
 @app.on_event("shutdown")
 async def shutdown_event():
     logger.info("🛑 Shutting down FastAPI application...")
@@ -71,6 +82,7 @@ def automate_grievance(
     user_email: str
 ):
     browser = get_browser()
+    #hardcoded location, we can make it dynamic by fetching user's location
     context = browser.new_context(
         permissions=["geolocation"],
         geolocation={"latitude": 23.36, "longitude": 85.33},  
