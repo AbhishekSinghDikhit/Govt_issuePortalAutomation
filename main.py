@@ -484,8 +484,10 @@ async def submit_grievance(
     extra_info: bool = Form(False),
     grievance_location: Optional[str] = Form(None),
     grievance_type: Optional[str] = Form(None),
-    ulb: str = Form(...),                 # ✅ City/Municipality
-    department: str = Form(...),          # ✅ New input for Department
+    ulb: str = Form(...),                 
+    department: str = Form(...),  
+    # department: department_names[Form(...)],
+    # ulb: ISSUE_TYPES[Form(...)],    
     user_name: str = Form(...),
     user_mobile: str = Form(...),
     user_email: str = Form(...)
@@ -505,12 +507,13 @@ async def submit_grievance(
             user_email,
         )
 
-        # ✅ After grievance automation, also forward to department email
+        # ✅ Load department list
         with open("departments.json", "r", encoding="utf-8") as f:
             departments = json.load(f)
 
         dept_info = departments.get(department)
         if dept_info and dept_info.get("email"):
+            # 1. Send grievance to department
             send_email(
                 to_email=dept_info["email"],
                 subject=f"New Grievance Raised - {department}",
@@ -532,14 +535,116 @@ Jharkhand Civic Issue Automation System
 """
             )
             result["forwarded_to_department"] = department
+
+            # 2. Send confirmation to user
+            send_email(
+                to_email=user_email,
+                subject="✅ Your Grievance Has Been Submitted",
+                body=f"""
+Hello {user_name},
+
+Your grievance has been successfully submitted and forwarded to the **{department}**.
+
+📝 Complaint Summary:
+{issue_text}
+
+📍 Location: {grievance_location or 'Not provided'}
+🏛️ ULB: {ulb}
+
+We will keep you updated once the department responds.  
+Thank you for helping improve civic services in Jharkhand!
+
+Regards,  
+Jharkhand Civic Issue Automation System
+"""
+            )
+            result["confirmation_sent_to_user"] = True
         else:
             result["forwarded_to_department"] = "No valid email found"
+            result["confirmation_sent_to_user"] = False
 
         return result
 
     except Exception as e:
         logger.exception("Internal Server Error while handling request")
         return {"status": "error", "message": f"Internal Server Error: {str(e)}"}
+    
+@app.post("/submit-email/")
+async def submit_email(
+    issue_text: str = Form(...),
+    grievance_location: Optional[str] = Form(None),
+    grievance_type: Optional[str] = Form(None),
+    ulb: str = Form(...),                
+    department: str = Form(...),          
+    user_name: str = Form(...),
+    user_mobile: str = Form(...),
+    user_email: str = Form(...)
+):
+    try:
+        # ✅ Load department list
+        with open("departments.json", "r", encoding="utf-8") as f:
+            departments = json.load(f)
+
+        dept_info = departments.get(department)
+        if not dept_info or not dept_info.get("email"):
+            return {"status": "error", "message": f"No valid email found for {department}"}
+
+        # 1. Send grievance to department
+        send_email(
+            to_email=dept_info["email"],
+            subject=f"New Grievance Raised - {department}",
+            body=f"""
+Dear {department},
+
+A new grievance has been raised.
+
+📍 Location: {grievance_location or 'Not provided'}
+🏛️ ULB: {ulb}
+👤 Name: {user_name}
+📱 Mobile: {user_mobile}
+✉️ User Email: {user_email}
+
+📝 Issue: {issue_text}
+
+Regards,  
+Jharkhand Civic Issue Automation System
+"""
+        )
+
+        # 2. Send confirmation to user
+        send_email(
+            to_email=user_email,
+            subject="✅ Your Grievance Has Been Submitted",
+            body=f"""
+Hello {user_name},
+
+Your grievance has been successfully submitted and forwarded to the **{department}**.
+
+📝 Complaint Summary:
+{issue_text}
+
+📍 Location: {grievance_location or 'Not provided'}
+🏛️ ULB: {ulb}
+
+We will keep you updated once the department responds.  
+Thank you for helping improve civic services in Jharkhand!
+
+Regards,  
+Jharkhand Civic Issue Automation System
+"""
+        )
+
+        return {
+            "status": "success",
+            "message": f"Grievance forwarded to {department} and confirmation sent to user",
+            "forwarded_to_department": department,
+            "confirmation_sent_to_user": True
+        }
+
+    except Exception as e:
+        logger.exception("Error while sending grievance email")
+        return {"status": "error", "message": f"Failed to send grievance email: {str(e)}"}
+
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)
