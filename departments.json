@@ -1,0 +1,211 @@
+{
+    "Dummy Department": {
+        "phone": ["0000000000"],
+        "email": "worldforscience@gmail.com"
+    },
+    "Department of Agriculture, Animal Husbandry & Co-operative": {
+        "phone": [
+            "2490929",
+            "2490578"
+        ],
+        "email": "jhagriculture@gmail"
+    },
+    "Department of Building Construction": {
+        "phone": [
+            "0651-2400735",
+            "0651-2401766"
+        ],
+        "email": "dsbcdranchi@gmail"
+    },
+    "Department of Cabinet Election": {
+        "phone": [
+            "06512440077"
+        ],
+        "email": "ceo_jharkhand@eci"
+    },
+    "Department of Cabinet Secretariat and Vigilance": {
+        "phone": [
+            "2400227",
+            "2400033"
+        ],
+        "email": "cabinetjhar@gmail"
+    },
+    "Department of Commercial Taxes": {
+        "phone": [
+            "2400941",
+            "2400944"
+        ],
+        "email": "comtaxhq@jharkhandcomtax"
+    },
+    "Department of Drinking Water and Sanitation": {
+        "phone": [
+            "2491410",
+            "2491069"
+        ],
+        "email": "dwsdacs@gmail"
+    },
+    "Department of Energy": {
+        "phone": [
+            "2446647",
+            "2446650"
+        ],
+        "email": null
+    },
+    "Department of Excise and Prohibition": {
+        "phone": [
+            "2280709",
+            "2280789"
+        ],
+        "email": "edcranchi@gmail"
+    },
+    "Department of Finance": {
+        "phone": [
+            "2491070",
+            "2400224"
+        ],
+        "email": null
+    },
+    "Department of Food, Public Distribution & Consumer Affairs": {
+        "phone": [
+            "2400960"
+        ],
+        "email": null
+    },
+    "Department of Forest, Environment & Climate Change": {
+        "phone": [
+            "2491669",
+            "2491098"
+        ],
+        "email": "cf-wpranchi@gov"
+    },
+    "Department of Health, Medical Education & Family Welfare": {
+        "phone": [
+            "2491033",
+            "2490314"
+        ],
+        "email": null
+    },
+    "Department of Home, Jail & Disaster Management": {
+        "phone": [
+            "2400220",
+            "2400700"
+        ],
+        "email": "homejharkhand@gmail"
+    },
+    "Department of Industries": {
+        "phone": [
+            "2446633",
+            "2446634"
+        ],
+        "email": null
+    },
+    "Department of Information & Public Relations": {
+        "phone": [
+            "2285037",
+            "2283675"
+        ],
+        "email": "iprd123@gmail"
+    },
+    "Department of Information Technology & e-Governance": {
+        "phone": [
+            "2400001",
+            "2400956"
+        ],
+        "email": null
+    },
+    "Department of Law": {
+        "phone": [
+            "06512400241"
+        ],
+        "email": "prsecylaw@jharkhandmail"
+    },
+    "Department of Mines & Geology": {
+        "phone": [
+            "0651-2490174",
+            "2490057"
+        ],
+        "email": null
+    },
+    "Department of Panchayati Raj": {
+        "phone": [
+            "0651-2401764",
+            "2401727"
+        ],
+        "email": "panchayat-jhr@nic"
+    },
+    "Department of Personnel, Administrative Reforms & Rajbhasha": {
+        "phone": [
+            "0651-2400865"
+        ],
+        "email": "dopjharkhand@gmail"
+    },
+    "Department of Revenue, Registration & Land Reforms": {
+        "phone": [
+            "2400767",
+            "2400768"
+        ],
+        "email": "dolrjh@gmail"
+    },
+    "Department of Road Construction": {
+        "phone": [
+            "2400210",
+            "2400747"
+        ],
+        "email": null
+    },
+    "Department of Rural Development": {
+        "phone": [
+            "2400244",
+            "2360251"
+        ],
+        "email": "rddjharkhand2013@gmail"
+    },
+    "Department of Scheduled Tribe, Scheduled Caste, Minority and Backward Class Welfare": {
+        "phone": [
+            "2400215",
+            "2446282"
+        ],
+        "email": "secretary-welfare@jharkhandmail"
+    },
+    "Department of School Education & Literacy": {
+        "phone": [
+            "0651-2400797",
+            "2400751"
+        ],
+        "email": "hrdjharkhand@gmail"
+    },
+    "Department of Tourism, Arts, Culture, Sports & Youth Affairs": {
+        "phone": [
+            "2400981"
+        ],
+        "email": "govjharkhandtourism@gmail"
+    },
+    "Department of Transport": {
+        "phone": [
+            "2401706",
+            "2446802"
+        ],
+        "email": null
+    },
+    "Department of Urban Development & Housing": {
+        "phone": [
+            "2400962",
+            "2446120"
+        ],
+        "email": null
+    },
+    "Department of Water Resources": {
+        "phone": [
+            "2491056",
+            "2490667"
+        ],
+        "email": "sec_wrd_jhr@nic"
+    },
+    "Department of Women, Child Development & Social Security": {
+        "phone": [
+            "2400757",
+            "2223544"
+        ],
+        "email": "swdjharkhand@gmail"
+    }
+}

@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import cv2
 import numpy as np
 import random, string
+import json
 
 
 # Logging setup
@@ -65,9 +66,13 @@ def get_browser():
         logger.info("✅ Browser launched successfully in thread")
     return thread_local.browser
 
+with open("departments.json", "r", encoding="utf-8") as f:
+        DEPARTMENT_CONTACTS = json.load(f)
+
 @app.on_event("startup")
 async def startup_event():
     logger.info("🚀 Starting FastAPI application...")
+
     
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -85,7 +90,7 @@ async def shutdown_event():
         logger.exception("Error during shutdown")
 
 
-def solve_captcha(page, max_retries: int = 5):
+def solve_captcha(page, max_retries: int = 10):
     """
     Try to solve captcha with OCR. Retry if OCR fails.
     """
@@ -160,6 +165,39 @@ def solve_captcha(page, max_retries: int = 5):
     return fallback
 
 
+#forward the complaint using email
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from dotenv import load_dotenv
+
+load_dotenv()
+
+SMTP_SERVER = "smtp.gmail.com"
+SMTP_PORT = 587
+SMTP_USER = os.getenv("SMTP_USER")  # set in env
+SMTP_PASS = os.getenv("SMTP_PASS")  # app password / key
+
+def send_email(to_email: str, subject: str, body: str):
+    """Send email via SMTP"""
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = SMTP_USER
+        msg["To"] = to_email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain"))
+
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASS)
+            server.sendmail(SMTP_USER, to_email, msg.as_string())
+
+        logger.info(f"📧 Email sent successfully to {to_email}")
+        return True
+    except Exception as e:
+        logger.exception(f"❌ Failed to send email to {to_email}")
+        return False
+
 def automate_grievance(
     issue_text: str,
     extra_info: bool,
@@ -218,7 +256,7 @@ def automate_grievance(
         page.get_by_role("button", name="Next").click()
 
         logger.info("Handling captcha with auto-retry OCR")
-        solve_captcha(page, max_retries=5)
+        solve_captcha(page, max_retries=10)
 
         # page.fill("input[name='captchaName']", captcha_text)
 
@@ -229,8 +267,25 @@ def automate_grievance(
         page.close()
         context.close()
 
+        # ✅ Forward complaint to department email
+        dept_contact = DEPARTMENT_CONTACTS.get(ulb)
+        if dept_contact and dept_contact.get("email"):
+            subject = f"New Grievance Raised - {grievance_type or 'General'}"
+            body = (
+                f"A new grievance has been submitted.\n\n"
+                f"Description: {issue_text}\n"
+                f"Location: {grievance_location}\n"
+                f"Type: {grievance_type}\n"
+                f"ULB: {ulb}\n\n"
+                f"User Details:\n"
+                f"Name: {user_name}\n"
+                f"Mobile: {user_mobile}\n"
+                f"Email: {user_email}\n"
+            )
+            send_email(dept_contact["email"], subject, body)
+
         # logger.info("Grievance submitted successfully ✅")
-        return {"status": "success", "message": "Grievance submitted successfully"}
+        return {"status": "success", "message": "Grievance submitted & forwarded to department"}
 
     except Exception as e:
         logger.exception("Error during grievance automation")
@@ -389,6 +444,39 @@ ISSUE_TYPES = {
     "BDR": "Regarding Birth/Death Registration",
 }
 
+department_names = {
+    "dummy": "Dummy Department",
+    "agriculture": "Department of Agriculture, Animal Husbandry & Co-operative",
+    "building_construction": "Department of Building Construction",
+    "cabinet_election": "Department of Cabinet Election",
+    "cabinet_secretariat": "Department of Cabinet Secretariat and Vigilance",
+    "commercial_taxes": "Department of Commercial Taxes",
+    "drinking_water": "Department of Drinking Water and Sanitation",
+    "energy": "Department of Energy",
+    "excise": "Department of Excise and Prohibition",
+    "finance": "Department of Finance",
+    "food_supply": "Department of Food, Public Distribution & Consumer Affairs",
+    "forest": "Department of Forest, Environment & Climate Change",
+    "health": "Department of Health, Medical Education & Family Welfare",
+    "home": "Department of Home, Jail & Disaster Management",
+    "industries": "Department of Industries",
+    "ipr": "Department of Information & Public Relations",
+    "it": "Department of Information Technology & e-Governance",
+    "law": "Department of Law",
+    "mines": "Department of Mines & Geology",
+    "panchayati_raj": "Department of Panchayati Raj",
+    "personnel": "Department of Personnel, Administrative Reforms & Rajbhasha",
+    "revenue": "Department of Revenue, Registration & Land Reforms",
+    "road_construction": "Department of Road Construction",
+    "rural_development": "Department of Rural Development",
+    "welfare": "Department of Scheduled Tribe, Scheduled Caste, Minority and Backward Class Welfare",
+    "school_edu": "Department of School Education & Literacy",
+    "tourism": "Department of Tourism, Arts, Culture, Sports & Youth Affairs",
+    "transport": "Department of Transport",
+    "urban_dev": "Department of Urban Development & Housing",
+    "water_resources": "Department of Water Resources",
+    "women_child": "Department of Women, Child Development & Social Security"
+}
 
 @app.post("/submit-grievance/")
 async def submit_grievance(
@@ -396,7 +484,8 @@ async def submit_grievance(
     extra_info: bool = Form(False),
     grievance_location: Optional[str] = Form(None),
     grievance_type: Optional[str] = Form(None),
-    ulb: str = Form(...),  
+    ulb: str = Form(...),                 # ✅ City/Municipality
+    department: str = Form(...),          # ✅ New input for Department
     user_name: str = Form(...),
     user_mobile: str = Form(...),
     user_email: str = Form(...)
@@ -415,7 +504,39 @@ async def submit_grievance(
             user_mobile,
             user_email,
         )
+
+        # ✅ After grievance automation, also forward to department email
+        with open("departments.json", "r", encoding="utf-8") as f:
+            departments = json.load(f)
+
+        dept_info = departments.get(department)
+        if dept_info and dept_info.get("email"):
+            send_email(
+                to_email=dept_info["email"],
+                subject=f"New Grievance Raised - {department}",
+                body=f"""
+Dear {department},
+
+A new grievance has been raised.
+
+📍 Location: {grievance_location or 'Not provided'}
+🏛️ ULB: {ulb}
+👤 Name: {user_name}
+📱 Mobile: {user_mobile}
+✉️ User Email: {user_email}
+
+📝 Issue: {issue_text}
+
+Regards,  
+Jharkhand Civic Issue Automation System
+"""
+            )
+            result["forwarded_to_department"] = department
+        else:
+            result["forwarded_to_department"] = "No valid email found"
+
         return result
+
     except Exception as e:
         logger.exception("Internal Server Error while handling request")
         return {"status": "error", "message": f"Internal Server Error: {str(e)}"}
