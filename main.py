@@ -485,9 +485,7 @@ async def submit_grievance(
     grievance_location: Optional[str] = Form(None),
     grievance_type: Optional[str] = Form(None),
     ulb: str = Form(...),                 
-    department: str = Form(...),  
-    # department: department_names[Form(...)],
-    # ulb: ISSUE_TYPES[Form(...)],    
+    department: str = Form(...),      
     user_name: str = Form(...),
     user_mobile: str = Form(...),
     user_email: str = Form(...)
