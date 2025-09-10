@@ -484,8 +484,8 @@ async def submit_grievance(
     extra_info: bool = Form(False),
     grievance_location: Optional[str] = Form(None),
     grievance_type: Optional[str] = Form(None),
-    ulb: str = Form(...),                 
-    department: str = Form(...),      
+    ulb: str = Form(...),                  # ULB key, e.g. "RMC"
+    department: str = Form(...),           # Dept key, e.g. "urban_dev"
     user_name: str = Form(...),
     user_mobile: str = Form(...),
     user_email: str = Form(...)
@@ -499,22 +499,25 @@ async def submit_grievance(
             extra_info,
             grievance_location,
             grievance_type,
-            ulb, 
+            ULB_OPTIONS.get(ulb, ulb),   # send display name to automation
             user_name,
             user_mobile,
             user_email,
         )
 
-        # ✅ Load department list
+        # Load contact details
         with open("departments.json", "r", encoding="utf-8") as f:
             departments = json.load(f)
 
-        # ✅ Load ULB info
         with open("ulb_info.json", "r", encoding="utf-8") as f:
             ULB_CONTACTS = {u["ulb_name"]: u for u in json.load(f)}
 
-        dept_info = departments.get(department)
-        ulb_info = ULB_CONTACTS.get(ulb)
+        # ✅ Resolve names via dict
+        dept_display = department_names.get(department, department)
+        ulb_display = ULB_OPTIONS.get(ulb, ulb)
+
+        dept_info = departments.get(department)  # json contacts
+        ulb_info = ULB_CONTACTS.get(ulb_display)  # json contacts (by display name)
 
         forwarded = []
 
@@ -522,14 +525,14 @@ async def submit_grievance(
         if dept_info and dept_info.get("email"):
             send_email(
                 to_email=dept_info["email"],
-                subject=f"New Grievance Raised - {department}",
+                subject=f"New Grievance Raised - {dept_display}",
                 body=f"""
-Dear {department},
+Dear {dept_display},
 
 A new grievance has been raised.
 
 📍 Location: {grievance_location or 'Not provided'}
-🏛️ ULB: {ulb}
+🏛️ ULB: {ulb_display}
 👤 Name: {user_name}
 📱 Mobile: {user_mobile}
 ✉️ User Email: {user_email}
@@ -540,20 +543,20 @@ Regards,
 Jharkhand Civic Issue Automation System
 """
             )
-            forwarded.append(f"Department: {department}")
+            forwarded.append(f"Department: {dept_display}")
 
         # 2. Send grievance to ULB
         if ulb_info and ulb_info.get("email"):
             send_email(
                 to_email=ulb_info["email"],
-                subject=f"New Grievance Raised - {ulb}",
+                subject=f"New Grievance Raised - {ulb_display}",
                 body=f"""
-Dear {ulb},
+Dear {ulb_display},
 
 A new grievance has been raised.
 
 📍 Location: {grievance_location or 'Not provided'}
-🏛️ ULB: {ulb}
+🏛️ ULB: {ulb_display}
 👤 Name: {user_name}
 📱 Mobile: {user_mobile}
 ✉️ User Email: {user_email}
@@ -564,9 +567,9 @@ Regards,
 Jharkhand Civic Issue Automation System
 """
             )
-            forwarded.append(f"ULB: {ulb}")
+            forwarded.append(f"ULB: {ulb_display}")
 
-        # 3. Send confirmation to User
+        # 3. Confirmation to user
         send_email(
             to_email=user_email,
             subject="✅ Your Grievance Has Been Submitted",
@@ -575,15 +578,14 @@ Hello {user_name},
 
 Your grievance has been successfully submitted and forwarded to:
 
-- Department: {department if dept_info else "N/A"}
-- ULB: {ulb if ulb_info else "N/A"}
+- Department: {dept_display if dept_info else "N/A"}
+- ULB: {ulb_display if ulb_info else "N/A"}
 
 📝 Complaint Summary:
 {issue_text}
 
 📍 Location: {grievance_location or 'Not provided'}
 
-We will keep you updated once there is a response.  
 Thank you for helping improve civic services in Jharkhand!
 
 Regards,  
@@ -599,44 +601,46 @@ Jharkhand Civic Issue Automation System
     except Exception as e:
         logger.exception("Internal Server Error while handling request")
         return {"status": "error", "message": f"Internal Server Error: {str(e)}"}
-    
 @app.post("/submit-email/")
 async def submit_email(
+    grievance_type: str = Form(...),
+    grievance_location: str = Form(...),
     issue_text: str = Form(...),
-    grievance_location: Optional[str] = Form(None),
-    grievance_type: Optional[str] = Form(None),
-    ulb: str = Form(...),                
-    department: str = Form(...),          
+    ulb: str = Form(...),               # ULB key, e.g. "RMC"
+    department: str = Form(...),        # Dept key, e.g. "urban_dev"
     user_name: str = Form(...),
     user_mobile: str = Form(...),
     user_email: str = Form(...)
 ):
     try:
-        # ✅ Load department list
+        # Load contact details
         with open("departments.json", "r", encoding="utf-8") as f:
             departments = json.load(f)
 
-        # ✅ Load ULB info
         with open("ulb_info.json", "r", encoding="utf-8") as f:
             ULB_CONTACTS = {u["ulb_name"]: u for u in json.load(f)}
 
+        # ✅ Resolve keys to display names
+        dept_display = department_names.get(department, department)
+        ulb_display = ULB_OPTIONS.get(ulb, ulb)
+
         dept_info = departments.get(department)
-        ulb_info = ULB_CONTACTS.get(ulb)
+        ulb_info = ULB_CONTACTS.get(ulb_display)
 
         forwarded = []
 
-        # 1. Send grievance to Department
+        # 1. Send to Department
         if dept_info and dept_info.get("email"):
             send_email(
                 to_email=dept_info["email"],
-                subject=f"New Grievance Raised - {department}",
+                subject=f"New Grievance Raised - {dept_display}",
                 body=f"""
-Dear {department},
+Dear {dept_display},
 
 A new grievance has been raised.
 
-📍 Location: {grievance_location or 'Not provided'}
-🏛️ ULB: {ulb}
+📍 Location: {grievance_location}
+🏛️ ULB: {ulb_display}
 👤 Name: {user_name}
 📱 Mobile: {user_mobile}
 ✉️ User Email: {user_email}
@@ -647,20 +651,20 @@ Regards,
 Jharkhand Civic Issue Automation System
 """
             )
-            forwarded.append(f"Department: {department}")
+            forwarded.append(f"Department: {dept_display}")
 
-        # 2. Send grievance to ULB
+        # 2. Send to ULB
         if ulb_info and ulb_info.get("email"):
             send_email(
                 to_email=ulb_info["email"],
-                subject=f"New Grievance Raised - {ulb}",
+                subject=f"New Grievance Raised - {ulb_display}",
                 body=f"""
-Dear {ulb},
+Dear {ulb_display},
 
 A new grievance has been raised.
 
-📍 Location: {grievance_location or 'Not provided'}
-🏛️ ULB: {ulb}
+📍 Location: {grievance_location}
+🏛️ ULB: {ulb_display}
 👤 Name: {user_name}
 📱 Mobile: {user_mobile}
 ✉️ User Email: {user_email}
@@ -671,9 +675,9 @@ Regards,
 Jharkhand Civic Issue Automation System
 """
             )
-            forwarded.append(f"ULB: {ulb}")
+            forwarded.append(f"ULB: {ulb_display}")
 
-        # 3. Send confirmation to User
+        # 3. Confirmation to user
         send_email(
             to_email=user_email,
             subject="✅ Your Grievance Has Been Submitted",
@@ -682,15 +686,14 @@ Hello {user_name},
 
 Your grievance has been successfully submitted and forwarded to:
 
-- Department: {department if dept_info else "N/A"}
-- ULB: {ulb if ulb_info else "N/A"}
+- Department: {dept_display if dept_info else "N/A"}
+- ULB: {ulb_display if ulb_info else "N/A"}
 
 📝 Complaint Summary:
 {issue_text}
 
-📍 Location: {grievance_location or 'Not provided'}
+📍 Location: {grievance_location}
 
-We will keep you updated once there is a response.  
 Thank you for helping improve civic services in Jharkhand!
 
 Regards,  
@@ -700,15 +703,13 @@ Jharkhand Civic Issue Automation System
 
         return {
             "status": "success",
-            "message": f"Grievance forwarded to {', '.join(forwarded)} and confirmation sent to user",
             "forwarded_to": forwarded,
             "confirmation_sent_to_user": True
         }
 
     except Exception as e:
-        logger.exception("Error while sending grievance email")
-        return {"status": "error", "message": f"Failed to send grievance email: {str(e)}"}
-
+        logger.exception("Internal Server Error while handling email submission")
+        return {"status": "error", "message": f"Internal Server Error: {str(e)}"}
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)
