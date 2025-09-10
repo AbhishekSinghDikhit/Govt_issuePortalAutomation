@@ -484,8 +484,8 @@ async def submit_grievance(
     extra_info: bool = Form(False),
     grievance_location: Optional[str] = Form(None),
     grievance_type: Optional[str] = Form(None),
-    ulb: str = Form(...),                  # ULB key, e.g. "RMC"
-    department: str = Form(...),           # Dept key, e.g. "urban_dev"
+    ulb: str = Form(...),
+    department: str = Form(...),
     user_name: str = Form(...),
     user_mobile: str = Form(...),
     user_email: str = Form(...)
@@ -499,7 +499,7 @@ async def submit_grievance(
             extra_info,
             grievance_location,
             grievance_type,
-            ULB_OPTIONS.get(ulb, ulb),   # send display name to automation
+            ULB_OPTIONS.get(ulb, ulb),
             user_name,
             user_mobile,
             user_email,
@@ -512,16 +512,35 @@ async def submit_grievance(
         with open("ulb_info.json", "r", encoding="utf-8") as f:
             ULB_CONTACTS = {u["ulb_name"]: u for u in json.load(f)}
 
-        # ✅ Resolve names via dict
-        dept_display = department_names.get(department, department)
-        ulb_display = ULB_OPTIONS.get(ulb, ulb)
+        # Normalize department input
+        department = department.strip()
+        logger.info(f"Received department: '{department}'")
 
-        dept_info = departments.get(department)  # json contacts
-        ulb_info = ULB_CONTACTS.get(ulb_display)  # json contacts (by display name)
+        # Resolve department display name
+        dept_display = department_names.get(department)
+        if not dept_display:
+            # Fallback: check if department is a display name
+            dept_display = next(
+                (v for k, v in department_names.items() if v.lower() == department.lower()),
+                department
+            )
+        logger.info(f"Resolved dept_display: '{dept_display}'")
+
+        # Resolve department key for departments.json
+        dept_key = next(
+            (k for k, v in department_names.items() if v.lower() == dept_display.lower()),
+            department
+        )
+        # Use the full department name for lookup in departments.json
+        dept_info = departments.get(dept_display)  # Use full name directly
+        logger.info(f"Resolved dept_info: {dept_info}")
+
+        ulb_display = ULB_OPTIONS.get(ulb, ulb)
+        ulb_info = ULB_CONTACTS.get(ulb_display)
 
         forwarded = []
 
-        # 1. Send grievance to Department
+        # Send grievance to Department
         if dept_info and dept_info.get("email"):
             send_email(
                 to_email=dept_info["email"],
@@ -545,7 +564,7 @@ Jharkhand Civic Issue Automation System
             )
             forwarded.append(f"Department: {dept_display}")
 
-        # 2. Send grievance to ULB
+        # Send grievance to ULB
         if ulb_info and ulb_info.get("email"):
             send_email(
                 to_email=ulb_info["email"],
@@ -569,7 +588,7 @@ Jharkhand Civic Issue Automation System
             )
             forwarded.append(f"ULB: {ulb_display}")
 
-        # 3. Confirmation to user
+        # Send confirmation to user
         send_email(
             to_email=user_email,
             subject="✅ Your Grievance Has Been Submitted",
@@ -595,19 +614,22 @@ Jharkhand Civic Issue Automation System
 
         result["forwarded_to"] = forwarded
         result["confirmation_sent_to_user"] = True
+        result["department_name"] = dept_display if dept_info else "N/A"
+        result["ulb_name"] = ulb_display if ulb_info else "N/A"
 
         return result
 
     except Exception as e:
         logger.exception("Internal Server Error while handling request")
         return {"status": "error", "message": f"Internal Server Error: {str(e)}"}
+    
 @app.post("/submit-email/")
 async def submit_email(
     grievance_type: str = Form(...),
     grievance_location: str = Form(...),
     issue_text: str = Form(...),
-    ulb: str = Form(...),               # ULB key, e.g. "RMC"
-    department: str = Form(...),        # Dept key, e.g. "urban_dev"
+    ulb: str = Form(...),
+    department: str = Form(...),
     user_name: str = Form(...),
     user_mobile: str = Form(...),
     user_email: str = Form(...)
@@ -620,21 +642,30 @@ async def submit_email(
         with open("ulb_info.json", "r", encoding="utf-8") as f:
             ULB_CONTACTS = {u["ulb_name"]: u for u in json.load(f)}
 
-        # ✅ Resolve keys to display names
-        # ✅ Department display resolution
+        # Normalize department input
+        department = department.strip()
+        logger.info(f"Received department: '{department}'")
+
+        # Resolve department display name
         dept_display = department_names.get(department)
         if not dept_display:
-            # fallback: if frontend mistakenly sent display name
-            dept_display = next((v for k, v in department_names.items() if v == department), department)
+            # Fallback: check if department is a display name
+            dept_display = next(
+                (v for k, v in department_names.items() if v.lower() == department.lower()),
+                department
+            )
+        logger.info(f"Resolved dept_display: '{dept_display}'")
+
+        # Use the full department name for lookup in departments.json
+        dept_info = departments.get(dept_display)
+        logger.info(f"Resolved dept_info: {dept_info}")
 
         ulb_display = ULB_OPTIONS.get(ulb, ulb)
-
-        dept_info = departments.get(department)
         ulb_info = ULB_CONTACTS.get(ulb_display)
 
         forwarded = []
 
-        # 1. Send to Department
+        # Send to Department
         if dept_info and dept_info.get("email"):
             send_email(
                 to_email=dept_info["email"],
@@ -658,7 +689,7 @@ Jharkhand Civic Issue Automation System
             )
             forwarded.append(f"Department: {dept_display}")
 
-        # 2. Send to ULB
+        # Send to ULB
         if ulb_info and ulb_info.get("email"):
             send_email(
                 to_email=ulb_info["email"],
@@ -682,7 +713,7 @@ Jharkhand Civic Issue Automation System
             )
             forwarded.append(f"ULB: {ulb_display}")
 
-        # 3. Confirmation to user
+        # Send confirmation to user
         send_email(
             to_email=user_email,
             subject="✅ Your Grievance Has Been Submitted",
@@ -709,12 +740,14 @@ Jharkhand Civic Issue Automation System
         return {
             "status": "success",
             "forwarded_to": forwarded,
-            "confirmation_sent_to_user": True
+            "confirmation_sent_to_user": True,
+            "department_name": dept_display if dept_info else "N/A",
+            "ulb_name": ulb_display if ulb_info else "N/A"
         }
 
     except Exception as e:
         logger.exception("Internal Server Error while handling email submission")
         return {"status": "error", "message": f"Internal Server Error: {str(e)}"}
-
+    
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)
