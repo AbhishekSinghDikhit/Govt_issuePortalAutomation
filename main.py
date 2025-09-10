@@ -621,7 +621,12 @@ async def submit_email(
             ULB_CONTACTS = {u["ulb_name"]: u for u in json.load(f)}
 
         # ✅ Resolve keys to display names
-        dept_display = department_names.get(department, department)
+        # ✅ Department display resolution
+        dept_display = department_names.get(department)
+        if not dept_display:
+            # fallback: if frontend mistakenly sent display name
+            dept_display = next((v for k, v in department_names.items() if v == department), department)
+
         ulb_display = ULB_OPTIONS.get(ulb, ulb)
 
         dept_info = departments.get(department)
