@@ -509,9 +509,17 @@ async def submit_grievance(
         with open("departments.json", "r", encoding="utf-8") as f:
             departments = json.load(f)
 
+        # ✅ Load ULB info
+        with open("ulb_info.json", "r", encoding="utf-8") as f:
+            ULB_CONTACTS = {u["ulb_name"]: u for u in json.load(f)}
+
         dept_info = departments.get(department)
+        ulb_info = ULB_CONTACTS.get(ulb)
+
+        forwarded = []
+
+        # 1. Send grievance to Department
         if dept_info and dept_info.get("email"):
-            # 1. Send grievance to department
             send_email(
                 to_email=dept_info["email"],
                 subject=f"New Grievance Raised - {department}",
@@ -532,34 +540,59 @@ Regards,
 Jharkhand Civic Issue Automation System
 """
             )
-            result["forwarded_to_department"] = department
+            forwarded.append(f"Department: {department}")
 
-            # 2. Send confirmation to user
+        # 2. Send grievance to ULB
+        if ulb_info and ulb_info.get("email"):
             send_email(
-                to_email=user_email,
-                subject="✅ Your Grievance Has Been Submitted",
+                to_email=ulb_info["email"],
+                subject=f"New Grievance Raised - {ulb}",
                 body=f"""
-Hello {user_name},
+Dear {ulb},
 
-Your grievance has been successfully submitted and forwarded to the **{department}**.
-
-📝 Complaint Summary:
-{issue_text}
+A new grievance has been raised.
 
 📍 Location: {grievance_location or 'Not provided'}
 🏛️ ULB: {ulb}
+👤 Name: {user_name}
+📱 Mobile: {user_mobile}
+✉️ User Email: {user_email}
 
-We will keep you updated once the department responds.  
-Thank you for helping improve civic services in Jharkhand!
+📝 Issue: {issue_text}
 
 Regards,  
 Jharkhand Civic Issue Automation System
 """
             )
-            result["confirmation_sent_to_user"] = True
-        else:
-            result["forwarded_to_department"] = "No valid email found"
-            result["confirmation_sent_to_user"] = False
+            forwarded.append(f"ULB: {ulb}")
+
+        # 3. Send confirmation to User
+        send_email(
+            to_email=user_email,
+            subject="✅ Your Grievance Has Been Submitted",
+            body=f"""
+Hello {user_name},
+
+Your grievance has been successfully submitted and forwarded to:
+
+- Department: {department if dept_info else "N/A"}
+- ULB: {ulb if ulb_info else "N/A"}
+
+📝 Complaint Summary:
+{issue_text}
+
+📍 Location: {grievance_location or 'Not provided'}
+
+We will keep you updated once there is a response.  
+Thank you for helping improve civic services in Jharkhand!
+
+Regards,  
+Jharkhand Civic Issue Automation System
+"""
+        )
+
+        result["forwarded_to"] = forwarded
+        result["confirmation_sent_to_user"] = True
 
         return result
 
@@ -583,15 +616,21 @@ async def submit_email(
         with open("departments.json", "r", encoding="utf-8") as f:
             departments = json.load(f)
 
-        dept_info = departments.get(department)
-        if not dept_info or not dept_info.get("email"):
-            return {"status": "error", "message": f"No valid email found for {department}"}
+        # ✅ Load ULB info
+        with open("ulb_info.json", "r", encoding="utf-8") as f:
+            ULB_CONTACTS = {u["ulb_name"]: u for u in json.load(f)}
 
-        # 1. Send grievance to department
-        send_email(
-            to_email=dept_info["email"],
-            subject=f"New Grievance Raised - {department}",
-            body=f"""
+        dept_info = departments.get(department)
+        ulb_info = ULB_CONTACTS.get(ulb)
+
+        forwarded = []
+
+        # 1. Send grievance to Department
+        if dept_info and dept_info.get("email"):
+            send_email(
+                to_email=dept_info["email"],
+                subject=f"New Grievance Raised - {department}",
+                body=f"""
 Dear {department},
 
 A new grievance has been raised.
@@ -607,24 +646,51 @@ A new grievance has been raised.
 Regards,  
 Jharkhand Civic Issue Automation System
 """
-        )
+            )
+            forwarded.append(f"Department: {department}")
 
-        # 2. Send confirmation to user
+        # 2. Send grievance to ULB
+        if ulb_info and ulb_info.get("email"):
+            send_email(
+                to_email=ulb_info["email"],
+                subject=f"New Grievance Raised - {ulb}",
+                body=f"""
+Dear {ulb},
+
+A new grievance has been raised.
+
+📍 Location: {grievance_location or 'Not provided'}
+🏛️ ULB: {ulb}
+👤 Name: {user_name}
+📱 Mobile: {user_mobile}
+✉️ User Email: {user_email}
+
+📝 Issue: {issue_text}
+
+Regards,  
+Jharkhand Civic Issue Automation System
+"""
+            )
+            forwarded.append(f"ULB: {ulb}")
+
+        # 3. Send confirmation to User
         send_email(
             to_email=user_email,
             subject="✅ Your Grievance Has Been Submitted",
             body=f"""
 Hello {user_name},
 
-Your grievance has been successfully submitted and forwarded to the **{department}**.
+Your grievance has been successfully submitted and forwarded to:
+
+- Department: {department if dept_info else "N/A"}
+- ULB: {ulb if ulb_info else "N/A"}
 
 📝 Complaint Summary:
 {issue_text}
 
 📍 Location: {grievance_location or 'Not provided'}
-🏛️ ULB: {ulb}
 
-We will keep you updated once the department responds.  
+We will keep you updated once there is a response.  
 Thank you for helping improve civic services in Jharkhand!
 
 Regards,  
@@ -634,8 +700,8 @@ Jharkhand Civic Issue Automation System
 
         return {
             "status": "success",
-            "message": f"Grievance forwarded to {department} and confirmation sent to user",
-            "forwarded_to_department": department,
+            "message": f"Grievance forwarded to {', '.join(forwarded)} and confirmation sent to user",
+            "forwarded_to": forwarded,
             "confirmation_sent_to_user": True
         }
 
