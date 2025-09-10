@@ -526,6 +526,26 @@ async def submit_grievance(
             )
         logger.info(f"Resolved dept_display: '{dept_display}'")
 
+        # ---------------------------
+        # ULB normalization (same pattern as department)
+        # ---------------------------
+
+        ulb = ulb.strip()
+        logger.info(f"Received ulb: '{ulb}'")
+
+        # Resolve ULB display name
+        ulb_display = ULB_OPTIONS.get(ulb)
+        if not ulb_display:
+            # Fallback: check if ulb is already a display name
+            ulb_display = next(
+                (v for k, v in ULB_OPTIONS.items() if v.lower() == ulb.lower()),
+                ulb
+            )
+        logger.info(f"Resolved ulb_display: '{ulb_display}'")
+        # Use the full ULB name for lookup in ulb_info.json
+        ulb_info = ULB_CONTACTS.get(ulb_display)
+        logger.info(f"Resolved ulb_info: {ulb_info}")
+
         # Resolve department key for departments.json
         dept_key = next(
             (k for k, v in department_names.items() if v.lower() == dept_display.lower()),
@@ -659,6 +679,22 @@ async def submit_email(
         # Use the full department name for lookup in departments.json
         dept_info = departments.get(dept_display)
         logger.info(f"Resolved dept_info: {dept_info}")
+
+        ulb = ulb.strip()
+        logger.info(f"Received ulb: '{ulb}'")
+
+        # Resolve ULB display name
+        ulb_display = ULB_OPTIONS.get(ulb)
+        if not ulb_display:
+            # Fallback: check if ulb is already a display name
+            ulb_display = next(
+                (v for k, v in ULB_OPTIONS.items() if v.lower() == ulb.lower()),
+                ulb
+            )
+        logger.info(f"Resolved ulb_display: '{ulb_display}'")
+        # Use the full ULB name for lookup in ulb_info.json
+        ulb_info = ULB_CONTACTS.get(ulb_display)
+        logger.info(f"Resolved ulb_info: {ulb_info}")
 
         ulb_display = ULB_OPTIONS.get(ulb, ulb)
         ulb_info = ULB_CONTACTS.get(ulb_display)
